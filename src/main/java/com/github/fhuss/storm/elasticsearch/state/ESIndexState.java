@@ -1,10 +1,12 @@
 package com.github.fhuss.storm.elasticsearch.state;
 
 import backtype.storm.task.IMetricsContext;
+import backtype.storm.topology.FailedException;
 import com.github.fhuss.storm.elasticsearch.handler.BulkResponseHandler;
 import com.github.fhuss.storm.elasticsearch.ClientFactory;
 import com.github.fhuss.storm.elasticsearch.Document;
 import com.github.fhuss.storm.elasticsearch.mapper.TridentTupleMapper;
+import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
@@ -16,6 +18,7 @@ import storm.trident.state.State;
 import storm.trident.state.StateFactory;
 import storm.trident.tuple.TridentTuple;
 
+import java.io.IOException;
 import java.util.*;
 
 /**
@@ -59,7 +62,13 @@ public class ESIndexState<T> implements State {
             bulkRequest.add(request);
         }
 
-        handler.handle(bulkRequest.execute().actionGet());
+        try {
+            handler.handle(bulkRequest.execute().actionGet());
+        } catch(ElasticsearchException e) {
+            LOGGER.error("error while executing bulk request to elasticsearch");
+            throw new FailedException("Failed to store data into elasticsearch", e);
+        }
+
     }
 
     public Collection<T> searchQuery(String query, List<String> indices, List<String> types) {
@@ -72,7 +81,11 @@ public class ESIndexState<T> implements State {
 
         List<T> result = new LinkedList<>();
         for(SearchHit hit : response.getHits()) {
-            result.add(serializer.deserialize(hit.source()));
+            try {
+                result.add(serializer.deserialize(hit.source()));
+            } catch (IOException e) {
+                LOGGER.error("Error while trying to deserialize data from json source");
+            }
         }
         return result;
     }

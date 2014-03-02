@@ -27,23 +27,11 @@ public abstract class ValueSerializer<T> implements Serializable {
 
     protected static final ObjectMapper mapper = new ObjectMapper();
 
-    public byte[] serialize(T o) {
-        try {
-            return mapper.writeValueAsBytes(o);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
+    public byte[] serialize(T o) throws IOException {
+        return mapper.writeValueAsBytes(o);
     }
 
-    public T deserialize(byte[] value) {
-        try {
-            return doDeserializable(value);
-        } catch(IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public abstract T doDeserializable(byte[] value) throws IOException;
+    public abstract T deserialize(byte[] value) throws IOException;
 
     /**
      * Basic serializer implementation for {@link storm.trident.state.TransactionalValue<T>}.
@@ -57,7 +45,7 @@ public abstract class ValueSerializer<T> implements Serializable {
 
 
         @Override
-        public T doDeserializable(byte[] value) throws IOException {
+        public T deserialize(byte[] value) throws IOException {
             return mapper.readValue(value, type);
         }
     }
@@ -75,7 +63,7 @@ public abstract class ValueSerializer<T> implements Serializable {
         }
 
         @Override
-        public TransactionalValue<T> doDeserializable(byte[] value) throws IOException {
+        public TransactionalValue<T> deserialize(byte[] value) throws IOException {
             ObjectNode node = mapper.readValue(value, ObjectNode.class);
             byte[] bytes = mapper.writeValueAsBytes(node.get(FIELD_VAL));
             return new TransactionalValue(node.get(FIELD_TXID).asLong(), mapper.readValue(bytes, type));
@@ -95,7 +83,7 @@ public abstract class ValueSerializer<T> implements Serializable {
         }
 
         @Override
-        public OpaqueValue<T> doDeserializable(byte[] value) throws IOException {
+        public OpaqueValue<T> deserialize(byte[] value) throws IOException {
             ObjectNode node = mapper.readValue(value, ObjectNode.class);
             long currTxid = node.get(FIELD_CURR_TIXD).asLong();
             T val = mapper.readValue(mapper.writeValueAsBytes(node.get(FIELD_CURR)), type);

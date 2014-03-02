@@ -5,6 +5,8 @@ import org.junit.Test;
 import storm.trident.state.OpaqueValue;
 import storm.trident.state.TransactionalValue;
 
+import java.io.IOException;
+
 import static com.github.fhuss.storm.elasticsearch.state.ValueSerializer.*;
 
 /**
@@ -27,7 +29,7 @@ public class ValueSerializerTest {
     }
 
     @Test
-    public void shouldDeSerializeNonTransactionValue( ) {
+    public void shouldDeSerializeNonTransactionValue( ) throws IOException {
 
         NonTransactionalValueSerializer<FooDocument> serializer = new NonTransactionalValueSerializer<>(FooDocument.class);
         byte[] value = serializer.serialize(new FooDocument("foo"));
@@ -38,7 +40,7 @@ public class ValueSerializerTest {
     }
 
     @Test
-    public void shouldSerializeTransactionValue( ) {
+    public void shouldSerializeTransactionValue( ) throws IOException {
         TransactionalValueSerializer<FooDocument> serializer = new TransactionalValueSerializer<>(FooDocument.class);
         byte[] value = serializer.serialize(new TransactionalValue<>(1L, new FooDocument("foo")));
 
@@ -49,7 +51,7 @@ public class ValueSerializerTest {
     }
 
     @Test
-    public void shouldSerializeOpaqueValueWithNoPreviousValue( ) {
+    public void shouldSerializeOpaqueValueWithNoPreviousValue( ) throws IOException {
         OpaqueValueSerializer<FooDocument> serializer = new OpaqueValueSerializer<>(FooDocument.class);
         byte[] value = serializer.serialize(new OpaqueValue(1L, new FooDocument("foo")));
 
@@ -60,7 +62,7 @@ public class ValueSerializerTest {
     }
 
     @Test
-    public void shouldSerializeOpaqueValueWithPreviousValue( ) {
+    public void shouldSerializeOpaqueValueWithPreviousValue( ) throws IOException {
         OpaqueValueSerializer<FooDocument> serializer = new OpaqueValueSerializer<>(FooDocument.class);
         byte[] value = serializer.serialize(new OpaqueValue(1L, new FooDocument("foo"), new FooDocument("bar")));
 

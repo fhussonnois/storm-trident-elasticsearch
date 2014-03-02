@@ -60,11 +60,11 @@ public class IndexMapStateTest {
         Utils.sleep(10000); // let's do some work
     }
 
+    @After
     public void tearDown( ) {
         drpc.shutdown();
         cluster.shutdown();
 
-        esSetup.execute(deleteAll());
         esSetup.terminate();
     }
 

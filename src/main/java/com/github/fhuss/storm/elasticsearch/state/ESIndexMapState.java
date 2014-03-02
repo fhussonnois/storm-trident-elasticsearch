@@ -1,9 +1,13 @@
 package com.github.fhuss.storm.elasticsearch.state;
 
 import backtype.storm.task.IMetricsContext;
+import backtype.storm.topology.FailedException;
+import backtype.storm.topology.ReportedFailedException;
 import backtype.storm.tuple.Values;
 import com.github.fhuss.storm.elasticsearch.handler.BulkResponseHandler;
 import com.github.fhuss.storm.elasticsearch.ClientFactory;
+import com.google.common.base.Objects;
+import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.get.MultiGetItemResponse;
@@ -11,16 +15,16 @@ import org.elasticsearch.action.get.MultiGetRequestBuilder;
 import org.elasticsearch.action.get.MultiGetResponse;
 import org.elasticsearch.client.Client;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import storm.trident.state.OpaqueValue;
 import storm.trident.state.State;
 import storm.trident.state.StateFactory;
 import storm.trident.state.StateType;
 import storm.trident.state.map.*;
 
-import java.util.List;
-import java.util.Map;
-import java.util.ArrayList;
-import java.util.ListIterator;
+import java.io.IOException;
+import java.util.*;
 
 import static com.github.fhuss.storm.elasticsearch.state.ValueSerializer.*;
 
@@ -33,10 +37,32 @@ import static com.github.fhuss.storm.elasticsearch.state.ValueSerializer.*;
  */
 public class ESIndexMapState<T> implements IBackingMap<T> {
 
-    private static final int cacheSize = 1000;
+    private static final Logger LOGGER = LoggerFactory.getLogger(ESIndexMapState.class);
 
-    private static final String globalKey = "GLOBAL$KEY";
+    public static class Options extends HashMap<String, String> {
 
+        private static final int DEFAULT_CACHE_SIZE = 1000;
+        private static final String DEFAULT_GLOBAL_KEY = "GLOBAL$KEY";
+        public static final String REPORT_ERROR = "trident.elasticsearch.state.report.error";
+        public static final String CACHE_SIZE   = "trident.elasticsearch.state.cache.size";
+        public static final String GLOBAL_KEY   = "trident.elasticsearch.state.global.key";
+
+        public Options(Map<String, String> conf) {
+            super(conf);
+        }
+        public boolean reportError() {
+            return Boolean.valueOf(get(REPORT_ERROR));
+        }
+        public int getCachedMapSize( ) {
+            String cacheSize = get(CACHE_SIZE);
+            return cacheSize != null ? Integer.valueOf(cacheSize) : DEFAULT_CACHE_SIZE;
+
+        }
+        public String getGlobalKey( ) {
+            String globalKey = get(GLOBAL_KEY);
+            return globalKey != null ? globalKey : DEFAULT_GLOBAL_KEY;
+        }
+    }
 
     public static <T> Factory<OpaqueValue<T>> opaque(ClientFactory client, Class<T> type) {
         return new OpaqueFactory(client, StateType.OPAQUE, new OpaqueValueSerializer(type));
@@ -71,9 +97,10 @@ public class ESIndexMapState<T> implements IBackingMap<T> {
         @Override
         public State makeState(Map conf, IMetricsContext iMetricsContext, int i, int i2) {
 
-            ESIndexMapState mapState = new ESIndexMapState(clientFactory.makeClient(conf), serializer, new BulkResponseHandler.LoggerResponseHandler());
-            MapState ms  = OpaqueMap.build(new CachedMap(mapState, cacheSize));
-            return new SnapshottableMap(ms, new Values(globalKey));
+            Options options = new Options(conf);
+            ESIndexMapState mapState = new ESIndexMapState(clientFactory.makeClient(conf), serializer, new BulkResponseHandler.LoggerResponseHandler(), options.reportError());
+            MapState ms  = OpaqueMap.build(new CachedMap(mapState, options.getCachedMapSize()));
+            return new SnapshottableMap(ms, new Values(options.getGlobalKey()));
         }
     }
 
@@ -86,9 +113,10 @@ public class ESIndexMapState<T> implements IBackingMap<T> {
         @Override
         public State makeState(Map conf, IMetricsContext iMetricsContext, int i, int i2) {
 
-            ESIndexMapState mapState = new ESIndexMapState(clientFactory.makeClient(conf), serializer, new BulkResponseHandler.LoggerResponseHandler());
-            MapState ms  = TransactionalMap.build(new CachedMap(mapState, cacheSize));
-            return new SnapshottableMap(ms, new Values(globalKey));
+            Options options = new Options(conf);
+            ESIndexMapState mapState = new ESIndexMapState(clientFactory.makeClient(conf), serializer, new BulkResponseHandler.LoggerResponseHandler(), options.reportError());
+            MapState ms  = TransactionalMap.build(new CachedMap(mapState, options.getCachedMapSize()));
+            return new SnapshottableMap(ms, new Values(options.getGlobalKey()));
         }
     }
 
@@ -101,9 +129,10 @@ public class ESIndexMapState<T> implements IBackingMap<T> {
         @Override
         public State makeState(Map conf, IMetricsContext iMetricsContext, int i, int i2) {
 
-            ESIndexMapState mapState = new ESIndexMapState(clientFactory.makeClient(conf), serializer, new BulkResponseHandler.LoggerResponseHandler());
-            MapState ms  = NonTransactionalMap.build(new CachedMap(mapState, cacheSize));
-            return new SnapshottableMap(ms, new Values(globalKey));
+            Options options = new Options(conf);
+            ESIndexMapState mapState = new ESIndexMapState(clientFactory.makeClient(conf), serializer, new BulkResponseHandler.LoggerResponseHandler(), options.reportError());
+            MapState ms  = NonTransactionalMap.build(new CachedMap(mapState, options.getCachedMapSize()));
+            return new SnapshottableMap(ms, new Values(options.getGlobalKey()));
         }
     }
 
@@ -111,10 +140,13 @@ public class ESIndexMapState<T> implements IBackingMap<T> {
     private ValueSerializer<T> serializer;
     private Client client;
 
-    public ESIndexMapState(Client client, ValueSerializer<T> serializer, BulkResponseHandler bulkResponseHandler) {
+    private boolean reportError;
+
+    public ESIndexMapState(Client client, ValueSerializer<T> serializer, BulkResponseHandler bulkResponseHandler, boolean reportError) {
         this.client = client;
         this.serializer = serializer;
         this.bulkResponseHandler = bulkResponseHandler;
+        this.reportError = reportError;
     }
 
     @Override
@@ -132,12 +164,22 @@ public class ESIndexMapState<T> implements IBackingMap<T> {
             for(GroupByKey key : groupByKeys) {
                 request.add(key.index, key.type, key.id);
             }
-
-            MultiGetResponse multiGetResponses = request.execute().actionGet();
+            MultiGetResponse multiGetResponses;
+            try {
+                multiGetResponses = request.execute().actionGet();
+            } catch (ElasticsearchException e) {
+               String error = "Failed to read data into elasticsearch";
+                throw (reportError) ? new ReportedFailedException(error, e) : new FailedException(error, e);
+            }
             for(MultiGetItemResponse itemResponse : multiGetResponses.getResponses()) {
                 GetResponse res = itemResponse.getResponse();
                 if( res != null && !res.isSourceEmpty()) {
-                    responses.add(serializer.deserialize(res.getSourceAsBytes()));
+                    try {
+                        responses.add(serializer.deserialize(res.getSourceAsBytes()));
+                    } catch (IOException e) {
+                        LOGGER.error("error while trying to deserialize data from json", e);
+                        responses.add(null);
+                    }
                 } else {
                     responses.add(null);
                 }
@@ -153,12 +195,22 @@ public class ESIndexMapState<T> implements IBackingMap<T> {
         while (listIterator.hasNext()) {
             GroupByKey groupBy = GroupByKey.fromKeysList(keys.get(listIterator.nextIndex()));
             T value = listIterator.next();
-
-            byte[] source = serializer.serialize(value);
-            bulkRequestBuilder.add(client.prepareIndex(groupBy.index, groupBy.type, groupBy.id).setSource(source));
+            try {
+                byte[] source = serializer.serialize(value);
+                bulkRequestBuilder.add(client.prepareIndex(groupBy.index, groupBy.type, groupBy.id).setSource(source));
+            } catch (IOException e) {
+               LOGGER.error("Oops data loss - error while trying to serialize data to json", e);
+               continue;
+            }
         }
 
-        bulkResponseHandler.handle(bulkRequestBuilder.execute().actionGet());
+        try {
+            bulkResponseHandler.handle(bulkRequestBuilder.execute().actionGet());
+        } catch(ElasticsearchException e) {
+            LOGGER.error("error while executing bulk request to elasticsearch");
+            String error = "Failed to store data into elasticsearch";
+            throw (reportError) ? new ReportedFailedException(error, e) : new FailedException(error, e);
+        }
     }
 
     private static class GroupByKey {
@@ -177,6 +229,13 @@ public class ESIndexMapState<T> implements IBackingMap<T> {
                 throw new RuntimeException("Keys not supported " + keys);
             }
             return new GroupByKey(keys.get(0).toString(), keys.get(1).toString(), keys.get(2).toString());
+        }
+
+        public String toString( ) {
+            return Objects.toStringHelper(this)
+                    .add("index", index)
+                    .add("type", type)
+                    .add("id", id).toString();
         }
     }
 }
