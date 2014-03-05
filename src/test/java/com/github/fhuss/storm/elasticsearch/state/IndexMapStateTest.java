@@ -40,7 +40,7 @@ import static com.github.tlrx.elasticsearch.test.EsSetup.*;
 public class IndexMapStateTest {
 
     static final ObjectMapper MAPPER = new ObjectMapper();
-    static final Settings SETTINGS = ImmutableSettings.settingsBuilder().put("cluster.name", "storm").build();
+    static final Settings SETTINGS = ImmutableSettings.settingsBuilder().loadFromClasspath("elasticsearch.yml").build();
 
     EsSetup esSetup;
     LocalCluster cluster;
