@@ -15,7 +15,7 @@ import java.util.List;
  *
  * @author fhussonnois
  */
-public class ESIndexUpdater<T> extends BaseStateUpdater<ESIndexState> {
+public class ESIndexUpdater<T> extends BaseStateUpdater<ESIndexState<T>> {
 
     private final TridentTupleMapper<Document<T>> documentTupleMapper;
     private final BulkResponseHandler bulkResponseHandler;
@@ -29,7 +29,7 @@ public class ESIndexUpdater<T> extends BaseStateUpdater<ESIndexState> {
         this.bulkResponseHandler = bulkResponseHandler;
     }
 
-    public void updateState(ESIndexState state, List<TridentTuple> inputs, TridentCollector collector) {
+    public void updateState(ESIndexState<T> state, List<TridentTuple> inputs, TridentCollector collector) {
         state.bulkUpdateIndices(inputs, documentTupleMapper, bulkResponseHandler);
     }
 }

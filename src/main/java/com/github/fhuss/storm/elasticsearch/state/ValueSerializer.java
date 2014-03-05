@@ -1,6 +1,5 @@
 package com.github.fhuss.storm.elasticsearch.state;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -66,7 +65,7 @@ public abstract class ValueSerializer<T> implements Serializable {
         public TransactionalValue<T> deserialize(byte[] value) throws IOException {
             ObjectNode node = mapper.readValue(value, ObjectNode.class);
             byte[] bytes = mapper.writeValueAsBytes(node.get(FIELD_VAL));
-            return new TransactionalValue(node.get(FIELD_TXID).asLong(), mapper.readValue(bytes, type));
+            return new TransactionalValue<>(node.get(FIELD_TXID).asLong(), mapper.readValue(bytes, type));
         }
     }
 
@@ -89,7 +88,7 @@ public abstract class ValueSerializer<T> implements Serializable {
             T val = mapper.readValue(mapper.writeValueAsBytes(node.get(FIELD_CURR)), type);
             JsonNode prevNode = node.get(FIELD_PREV);
             T prev = (prevNode.isNull()) ? null : mapper.readValue(mapper.writeValueAsBytes(prevNode), type);
-            return new OpaqueValue(currTxid, val, prev);
+            return new OpaqueValue<>(currTxid, val, prev);
         }
     }
 }

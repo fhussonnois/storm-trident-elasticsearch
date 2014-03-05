@@ -65,7 +65,7 @@ public class ESIndexMapState<T> implements IBackingMap<T> {
     }
 
     public static <T> Factory<OpaqueValue<T>> opaque(ClientFactory client, Class<T> type) {
-        return new OpaqueFactory(client, StateType.OPAQUE, new OpaqueValueSerializer(type));
+        return new OpaqueFactory<>(client, StateType.OPAQUE, new OpaqueValueSerializer<>(type));
     }
 
     public static <T> Factory<TransactionalFactory<T>> transactional(ClientFactory client, Class<T> type) {
@@ -98,7 +98,7 @@ public class ESIndexMapState<T> implements IBackingMap<T> {
         public State makeState(Map conf, IMetricsContext iMetricsContext, int i, int i2) {
 
             Options options = new Options(conf);
-            ESIndexMapState mapState = new ESIndexMapState(clientFactory.makeClient(conf), serializer, new BulkResponseHandler.LoggerResponseHandler(), options.reportError());
+            ESIndexMapState mapState = new ESIndexMapState<>(clientFactory.makeClient(conf), serializer, new BulkResponseHandler.LoggerResponseHandler(), options.reportError());
             MapState ms  = OpaqueMap.build(new CachedMap(mapState, options.getCachedMapSize()));
             return new SnapshottableMap(ms, new Values(options.getGlobalKey()));
         }
@@ -200,7 +200,6 @@ public class ESIndexMapState<T> implements IBackingMap<T> {
                 bulkRequestBuilder.add(client.prepareIndex(groupBy.index, groupBy.type, groupBy.id).setSource(source));
             } catch (IOException e) {
                LOGGER.error("Oops data loss - error while trying to serialize data to json", e);
-               continue;
             }
         }
 
