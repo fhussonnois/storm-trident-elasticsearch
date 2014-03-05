@@ -4,8 +4,8 @@ import backtype.storm.task.IMetricsContext;
 import backtype.storm.topology.FailedException;
 import backtype.storm.topology.ReportedFailedException;
 import backtype.storm.tuple.Values;
-import com.github.fhuss.storm.elasticsearch.handler.BulkResponseHandler;
 import com.github.fhuss.storm.elasticsearch.ClientFactory;
+import com.github.fhuss.storm.elasticsearch.handler.BulkResponseHandler;
 import com.google.common.base.Objects;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
@@ -14,17 +14,27 @@ import org.elasticsearch.action.get.MultiGetItemResponse;
 import org.elasticsearch.action.get.MultiGetRequestBuilder;
 import org.elasticsearch.action.get.MultiGetResponse;
 import org.elasticsearch.client.Client;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import storm.trident.state.OpaqueValue;
 import storm.trident.state.State;
 import storm.trident.state.StateFactory;
 import storm.trident.state.StateType;
-import storm.trident.state.map.*;
+import storm.trident.state.TransactionalValue;
+import storm.trident.state.map.CachedMap;
+import storm.trident.state.map.IBackingMap;
+import storm.trident.state.map.MapState;
+import storm.trident.state.map.NonTransactionalMap;
+import storm.trident.state.map.OpaqueMap;
+import storm.trident.state.map.SnapshottableMap;
+import storm.trident.state.map.TransactionalMap;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
 
 import static com.github.fhuss.storm.elasticsearch.state.ValueSerializer.*;
 
@@ -65,15 +75,15 @@ public class ESIndexMapState<T> implements IBackingMap<T> {
     }
 
     public static <T> Factory<OpaqueValue<T>> opaque(ClientFactory client, Class<T> type) {
-        return new OpaqueFactory(client, StateType.OPAQUE, new OpaqueValueSerializer(type));
+        return new OpaqueFactory<>(client, StateType.OPAQUE, new OpaqueValueSerializer<>(type));
     }
 
-    public static <T> Factory<TransactionalFactory<T>> transactional(ClientFactory client, Class<T> type) {
-        return new TransactionalFactory(client, StateType.TRANSACTIONAL, new TransactionalValueSerializer(type));
+    public static <T> Factory<TransactionalValue<T>> transactional(ClientFactory client, Class<T> type) {
+        return new TransactionalFactory<>(client, StateType.TRANSACTIONAL, new TransactionalValueSerializer<>(type));
     }
 
     public static <T> Factory<T> nonTransactional(ClientFactory client, Class<T> type) {
-        return new NonTransactionalFactory(client, StateType.NON_TRANSACTIONAL, new NonTransactionalValueSerializer(type));
+        return new NonTransactionalFactory<>(client, StateType.NON_TRANSACTIONAL, new NonTransactionalValueSerializer<>(type));
     }
 
     public abstract static class Factory<T> implements StateFactory {
@@ -96,43 +106,41 @@ public class ESIndexMapState<T> implements IBackingMap<T> {
 
         @Override
         public State makeState(Map conf, IMetricsContext iMetricsContext, int i, int i2) {
-
             Options options = new Options(conf);
-            ESIndexMapState mapState = new ESIndexMapState(clientFactory.makeClient(conf), serializer, new BulkResponseHandler.LoggerResponseHandler(), options.reportError());
+            ESIndexMapState<OpaqueValue<T>> mapState = new ESIndexMapState<>(clientFactory.makeClient(conf), serializer, new BulkResponseHandler.LoggerResponseHandler(), options.reportError());
             MapState ms  = OpaqueMap.build(new CachedMap(mapState, options.getCachedMapSize()));
-            return new SnapshottableMap(ms, new Values(options.getGlobalKey()));
+            return new SnapshottableMap<OpaqueValue<T>>(ms, new Values(options.getGlobalKey()));
         }
     }
 
-    public static class TransactionalFactory<T> extends Factory<TransactionalFactory<T>> {
+    public static class TransactionalFactory<T> extends Factory<TransactionalValue<T>> {
 
-        public TransactionalFactory(ClientFactory clientFactory, StateType stateType, ValueSerializer<TransactionalFactory<T>> serializer) {
+        public TransactionalFactory(ClientFactory clientFactory, StateType stateType, ValueSerializer<TransactionalValue<T>> serializer) {
             super(clientFactory, stateType, serializer);
         }
 
         @Override
         public State makeState(Map conf, IMetricsContext iMetricsContext, int i, int i2) {
-
             Options options = new Options(conf);
-            ESIndexMapState mapState = new ESIndexMapState(clientFactory.makeClient(conf), serializer, new BulkResponseHandler.LoggerResponseHandler(), options.reportError());
-            MapState ms  = TransactionalMap.build(new CachedMap(mapState, options.getCachedMapSize()));
-            return new SnapshottableMap(ms, new Values(options.getGlobalKey()));
+            ESIndexMapState<TransactionalValue<T>> mapState = new ESIndexMapState<>(clientFactory.makeClient(conf), serializer, new BulkResponseHandler.LoggerResponseHandler(), options.reportError());
+            MapState<T> ms  = TransactionalMap.build(new CachedMap(mapState, options.getCachedMapSize()));
+            Values snapshotKey = new Values(options.getGlobalKey());
+            return new SnapshottableMap<>(ms, snapshotKey);
         }
     }
 
-    public static class NonTransactionalFactory<T> extends Factory<TransactionalFactory<T>> {
+    public static class NonTransactionalFactory<T> extends Factory<T> {
 
-        public NonTransactionalFactory(ClientFactory clientFactory, StateType stateType, ValueSerializer<TransactionalFactory<T>> serializer) {
+        public NonTransactionalFactory(ClientFactory clientFactory, StateType stateType, ValueSerializer<T> serializer) {
             super(clientFactory, stateType, serializer);
         }
 
         @Override
         public State makeState(Map conf, IMetricsContext iMetricsContext, int i, int i2) {
-
             Options options = new Options(conf);
-            ESIndexMapState mapState = new ESIndexMapState(clientFactory.makeClient(conf), serializer, new BulkResponseHandler.LoggerResponseHandler(), options.reportError());
-            MapState ms  = NonTransactionalMap.build(new CachedMap(mapState, options.getCachedMapSize()));
-            return new SnapshottableMap(ms, new Values(options.getGlobalKey()));
+            ESIndexMapState<T> mapState = new ESIndexMapState<>(clientFactory.makeClient(conf), serializer, new BulkResponseHandler.LoggerResponseHandler(), options.reportError());
+            MapState<T> ms  = NonTransactionalMap.build(new CachedMap<>(mapState, options.getCachedMapSize()));
+            return new SnapshottableMap<>(ms, new Values(options.getGlobalKey()));
         }
     }
 
@@ -200,7 +208,6 @@ public class ESIndexMapState<T> implements IBackingMap<T> {
                 bulkRequestBuilder.add(client.prepareIndex(groupBy.index, groupBy.type, groupBy.id).setSource(source));
             } catch (IOException e) {
                LOGGER.error("Oops data loss - error while trying to serialize data to json", e);
-               continue;
             }
         }
 

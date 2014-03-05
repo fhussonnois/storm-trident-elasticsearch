@@ -53,7 +53,7 @@ public class ValueSerializerTest {
     @Test
     public void shouldSerializeOpaqueValueWithNoPreviousValue( ) throws IOException {
         OpaqueValueSerializer<FooDocument> serializer = new OpaqueValueSerializer<>(FooDocument.class);
-        byte[] value = serializer.serialize(new OpaqueValue(1L, new FooDocument("foo")));
+        byte[] value = serializer.serialize(new OpaqueValue<>(1L, new FooDocument("foo")));
 
         OpaqueValue<FooDocument> actual = serializer.deserialize(value);
         Assert.assertNotNull(actual);
@@ -64,7 +64,7 @@ public class ValueSerializerTest {
     @Test
     public void shouldSerializeOpaqueValueWithPreviousValue( ) throws IOException {
         OpaqueValueSerializer<FooDocument> serializer = new OpaqueValueSerializer<>(FooDocument.class);
-        byte[] value = serializer.serialize(new OpaqueValue(1L, new FooDocument("foo"), new FooDocument("bar")));
+        byte[] value = serializer.serialize(new OpaqueValue<>(1L, new FooDocument("foo"), new FooDocument("bar")));
 
         OpaqueValue<FooDocument> actual = serializer.deserialize(value);
         Assert.assertNotNull(actual);

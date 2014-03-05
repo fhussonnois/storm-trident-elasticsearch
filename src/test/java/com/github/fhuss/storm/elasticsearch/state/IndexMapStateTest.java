@@ -40,7 +40,7 @@ import static com.github.tlrx.elasticsearch.test.EsSetup.*;
 public class IndexMapStateTest {
 
     static final ObjectMapper MAPPER = new ObjectMapper();
-    static final Settings SETTINGS = ImmutableSettings.settingsBuilder().put("cluster.name", "storm").build();
+    static final Settings SETTINGS = ImmutableSettings.settingsBuilder().loadFromClasspath("elasticsearch.yml").build();
 
     EsSetup esSetup;
     LocalCluster cluster;
@@ -93,7 +93,7 @@ public class IndexMapStateTest {
         @Override
         public void execute(TridentTuple tuple, TridentCollector collector) {
             String sentence = tuple.getString(0);
-            collector.emit(new Values( new Document("my_index", "my_type", sentence, String.valueOf(sentence.hashCode()))));
+            collector.emit(new Values( new Document<>("my_index", "my_type", sentence, String.valueOf(sentence.hashCode()))));
         }
     }
 
@@ -156,7 +156,7 @@ public class IndexMapStateTest {
 
         TridentTopology topology = new TridentTopology();
 
-        TridentState staticState = topology.newStaticState(new ESIndexState.Factory(new LocalTransport(SETTINGS.getAsMap()), Tweet.class));
+        TridentState staticState = topology.newStaticState(new ESIndexState.Factory<>(new LocalTransport(SETTINGS.getAsMap()), Tweet.class));
 
         topology.newStream("tweets", spout)
                         .each(new Fields("sentence"), new DocumentBuilder(), new Fields("document"))

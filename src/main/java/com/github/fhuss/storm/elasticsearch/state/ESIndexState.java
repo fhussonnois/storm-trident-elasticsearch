@@ -97,12 +97,12 @@ public class ESIndexState<T> implements State {
 
         public Factory(ClientFactory clientFactory, Class<T> clazz ) {
             this.clientFactory = clientFactory;
-            this.serializer = new ValueSerializer.NonTransactionalValueSerializer(clazz);
+            this.serializer = new ValueSerializer.NonTransactionalValueSerializer<>(clazz);
         }
 
         @Override
         public State makeState(Map map, IMetricsContext iMetricsContext, int i, int i2) {
-            return new ESIndexState(makeClient(map), serializer);
+            return new ESIndexState<>(makeClient(map), serializer);
         }
 
         protected Client makeClient(Map map) {
