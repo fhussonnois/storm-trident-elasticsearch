@@ -108,7 +108,7 @@ public class ESIndexMapState<T> implements IBackingMap<T> {
         public State makeState(Map conf, IMetricsContext iMetricsContext, int i, int i2) {
             Options options = new Options(conf);
             ESIndexMapState<OpaqueValue<T>> mapState = new ESIndexMapState<>(clientFactory.makeClient(conf), serializer, new BulkResponseHandler.LoggerResponseHandler(), options.reportError());
-            MapState ms  = OpaqueMap.build(new CachedMap<>(mapState, options.getCachedMapSize()));
+            MapState ms  = OpaqueMap.build(new CachedMap(mapState, options.getCachedMapSize()));
             return new SnapshottableMap<OpaqueValue<T>>(ms, new Values(options.getGlobalKey()));
         }
     }
