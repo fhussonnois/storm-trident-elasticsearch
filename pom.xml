@@ -12,11 +12,15 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <storm.version>0.9.0</storm.version>
-        <org.slf4j.version>1.7.5</org.slf4j.version>
-        <org.elasticsearch.version>1.0.0</org.elasticsearch.version>
-        <jackson.databind.version>2.1.3</jackson.databind.version>
         <java.version>1.7</java.version>
+        <storm.version>0.9.0.1</storm.version>
+        <org.slf4j.version>1.7.6</org.slf4j.version>
+        <org.elasticsearch.version>1.0.1</org.elasticsearch.version>
+        <jackson.databind.version>2.3.2</jackson.databind.version>
+        <junit.version>4.11</junit.version>
+        <elasticsearch-test.version>0.90.6</elasticsearch-test.version>
+        <guava.version>16.0.1</guava.version>
+        <commons-lang3.version>3.3</commons-lang3.version>
     </properties>
 
     <licenses>
@@ -63,7 +67,7 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.0</version>
+            <version>${commons-lang3.version}</version>
         </dependency>
 
         <dependency>
@@ -95,7 +99,7 @@
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>10.0</version>
+            <version>${guava.version}</version>
         </dependency>
 
         <!-- Tests -->
@@ -108,7 +112,7 @@
         <dependency>
             <groupId>com.github.tlrx</groupId>
             <artifactId>elasticsearch-test</artifactId>
-            <version>0.0.8</version>
+            <version>${elasticsearch-test.version}</version>
             <scope>test</scope>
         </dependency>
 
