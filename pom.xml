@@ -18,7 +18,7 @@
         <org.elasticsearch.version>1.0.1</org.elasticsearch.version>
         <jackson.databind.version>2.3.2</jackson.databind.version>
         <junit.version>4.11</junit.version>
-        <elasticsearch-test.version>0.90.6</elasticsearch-test.version>
+        <elasticsearch-test.version>1.2.1</elasticsearch-test.version>
         <guava.version>16.0.1</guava.version>
         <commons-lang3.version>3.3</commons-lang3.version>
     </properties>
