@@ -76,7 +76,7 @@ public class IndexBatchBolt<T> implements IRichBolt {
         BulkRequestBuilder bulkRequest = client.prepareBulk();
         for (Tuple input : inputs) {
             Document doc = mapper.map(input);
-            IndexRequestBuilder request = client.prepareIndex(doc.getName(), doc.getType(), doc.getId()).setSource(doc.getSource());
+            IndexRequestBuilder request = client.prepareIndex(doc.getName(), doc.getType(), doc.getId()).setSource(doc.getSource().toString());
 
             if(doc.getParentId() != null) {
                 request.setParent(doc.getParentId());
@@ -84,8 +84,10 @@ public class IndexBatchBolt<T> implements IRichBolt {
             bulkRequest.add(request);
         }
 
-        BulkResponse bulkItemResponses = bulkRequest.execute().actionGet();
-        if( bulkItemResponses.hasFailures()) failAll(inputs) ; else ackAll(inputs);
+        if( bulkRequest.numberOfActions() > 0) {
+            BulkResponse bulkItemResponses = bulkRequest.execute().actionGet();
+            if( bulkItemResponses.hasFailures()) failAll(inputs) ; else ackAll(inputs);
+        }
     }
 
     protected void ackAll(List<Tuple> inputs) {
