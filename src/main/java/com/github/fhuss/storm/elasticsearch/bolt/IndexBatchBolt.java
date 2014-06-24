@@ -75,8 +75,8 @@ public class IndexBatchBolt<T> implements IRichBolt {
         queue.drainTo(inputs);
         BulkRequestBuilder bulkRequest = client.prepareBulk();
         for (Tuple input : inputs) {
-            Document doc = mapper.map(input);
-            IndexRequestBuilder request = client.prepareIndex(doc.getName(), doc.getType(), doc.getId()).setSource(doc.getSource().toString());
+            Document<T> doc = mapper.map(input);
+            IndexRequestBuilder request = client.prepareIndex(doc.getName(), doc.getType(), doc.getId()).setSource((String)doc.getSource());
 
             if(doc.getParentId() != null) {
                 request.setParent(doc.getParentId());

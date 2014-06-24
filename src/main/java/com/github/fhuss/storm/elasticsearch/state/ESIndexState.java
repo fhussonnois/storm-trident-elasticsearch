@@ -52,23 +52,23 @@ public class ESIndexState<T> implements State {
     public void bulkUpdateIndices(List<TridentTuple> inputs, TridentTupleMapper<Document<T>> mapper, BulkResponseHandler handler) {
         BulkRequestBuilder bulkRequest = client.prepareBulk();
         for (TridentTuple input : inputs) {
-            Document doc = mapper.map(input);
-            IndexRequestBuilder request = client.prepareIndex(doc.getName(), doc.getType(), doc.getId()).setSource(doc.getSource());
+            Document<T> doc = mapper.map(input);
+            IndexRequestBuilder request = client.prepareIndex(doc.getName(), doc.getType(), doc.getId()).setSource((String)doc.getSource());
 
             if(doc.getParentId() != null) {
                 request.setParent(doc.getParentId());
             }
-
             bulkRequest.add(request);
         }
 
-        try {
-            handler.handle(bulkRequest.execute().actionGet());
-        } catch(ElasticsearchException e) {
-            LOGGER.error("error while executing bulk request to elasticsearch");
-            throw new FailedException("Failed to store data into elasticsearch", e);
+        if( bulkRequest.numberOfActions() > 0) {
+            try {
+                handler.handle(bulkRequest.execute().actionGet());
+            } catch(ElasticsearchException e) {
+                LOGGER.error("error while executing bulk request to elasticsearch");
+                throw new FailedException("Failed to store data into elasticsearch", e);
+            }
         }
-
     }
 
     public Collection<T> searchQuery(String query, List<String> indices, List<String> types) {
