@@ -1,15 +1,13 @@
 package com.github.fhuss.storm.elasticsearch.bolt;
 
-import backtype.storm.Config;
-import backtype.storm.Constants;
 import backtype.storm.task.OutputCollector;
 import backtype.storm.task.TopologyContext;
-import backtype.storm.topology.IRichBolt;
 import backtype.storm.topology.OutputFieldsDeclarer;
 import backtype.storm.tuple.Tuple;
 
 import com.github.fhuss.storm.elasticsearch.ClientFactory;
 import com.github.fhuss.storm.elasticsearch.Document;
+import com.github.fhuss.storm.elasticsearch.commons.RichTickTupleBolt;
 import com.github.fhuss.storm.elasticsearch.mapper.TupleMapper;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
@@ -23,15 +21,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Simple Bolt to index documents batch into an elasticsearch cluster.
  *
  * @author fhussonnois
  */
-public class IndexBatchBolt<T> implements IRichBolt {
+public class IndexBatchBolt<T> extends RichTickTupleBolt {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(IndexBatchBolt.class);
+
+    public static final TimeUnit DEFAULT_TIME_UNIT = TimeUnit.SECONDS;
+
+    public static final long DEFAULT_EMIT_FREQUENCY = 10;
 
     private static final int QUEUE_MAX_SIZE = 1000;
 
@@ -45,11 +48,42 @@ public class IndexBatchBolt<T> implements IRichBolt {
 
     private TupleMapper<Document<T>> mapper;
 
-    public IndexBatchBolt(ClientFactory clientFactory, TupleMapper<Document<T>> mapper) {
+    /**
+     * Creates a new {@link IndexBatchBolt} instance.
+     *
+     * @param emitFrequency the batch frequency
+     * @param unit the time unit of the emit frequency
+     * @param clientFactory the elasticsearch client factory
+     * @param mapper the document tuple mapper
+     */
+    public IndexBatchBolt(ClientFactory clientFactory, TupleMapper<Document<T>> mapper, long emitFrequency, TimeUnit unit) {
+        super(emitFrequency, unit);
         this.clientFactory = clientFactory;
         this.mapper = mapper;
     }
 
+    /**
+     * Creates a new {@link IndexBatchBolt} instance which use SECOND as time unit for batch frequency.
+     * @param clientFactory the elasticsearch client factory
+     * @param mapper the the document tuple mapper
+     */
+    public IndexBatchBolt(ClientFactory clientFactory, TupleMapper<Document<T>> mapper, long emitFrequency) {
+        this(clientFactory, mapper, emitFrequency, DEFAULT_TIME_UNIT);
+    }
+
+    /**
+     * Creates a new {@link IndexBatchBolt} instance with a default batch frequency set to 10 seconds.
+     * @param clientFactory the elasticsearch client factory
+     * @param mapper the the document tuple mapper
+     */
+    public IndexBatchBolt(ClientFactory clientFactory, TupleMapper<Document<T>> mapper) {
+        this(clientFactory, mapper, DEFAULT_EMIT_FREQUENCY, DEFAULT_TIME_UNIT);
+    }
+
+    /**
+     * (non-Javadoc)
+     * @see backtype.storm.task.IBolt#prepare(Map, TopologyContext, OutputCollector).
+     */
     @Override
     public void prepare(Map stormConf, TopologyContext topologyContext, OutputCollector outputCollector) {
         this.outputCollector = outputCollector;
@@ -58,12 +92,14 @@ public class IndexBatchBolt<T> implements IRichBolt {
     }
 
     @Override
-    public void execute(Tuple tuple) {
+    protected void executeTickTuple(Tuple tuple) {
+        bulkUpdateIndexes();
+        outputCollector.ack(tuple);
+    }
 
-        if( isTickTuple(tuple)) {
-            bulkUpdateIndexes();
-            outputCollector.ack(tuple);
-        } else if( ! queue.offer(tuple) ) {
+    @Override
+    protected void executeTuple(Tuple tuple) {
+        if( ! queue.offer(tuple) ) {
             bulkUpdateIndexes();
             queue.add(tuple);
         }
@@ -108,17 +144,5 @@ public class IndexBatchBolt<T> implements IRichBolt {
     @Override
     public void cleanup() {
         if( this.client != null) this.client.close();
-    }
-
-    private static boolean isTickTuple(Tuple tuple) {
-        return tuple.getSourceComponent().equals(Constants.SYSTEM_COMPONENT_ID)
-                && tuple.getSourceStreamId().equals(Constants.SYSTEM_TICK_STREAM_ID);
-    }
-
-    @Override
-    public Map<String, Object> getComponentConfiguration() {
-        Config conf = new Config();
-        conf.put(Config.TOPOLOGY_TICK_TUPLE_FREQ_SECS, 10);
-        return conf;
     }
 }
