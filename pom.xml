@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.github.fhuss.storm</groupId>
-    <artifactId>trident-elasticsearch</artifactId>
+    <artifactId>storm-elasticsearch</artifactId>
     <version>0.2.0</version>
     <name>Storm Trident Elasticsearch</name>
     <description>Trident API implementation for Elasticsearch</description>
@@ -42,12 +42,11 @@
         </developer>
     </developers>
 
-    <repositories>
-        <repository>
-            <id>clojars.org</id>
-            <url>http://clojars.org/repo</url>
-        </repository>
-    </repositories>
+    <scm>
+        <connection>scm:git:git@github.com:fhussonnois/storm-trident-elasticsearch.git</connection>
+        <developerConnection>scm:git:git@github.com:fhussonnois/storm-trident-elasticsearch.git</developerConnection>
+        <url>git@github.com:fhussonnois/storm-trident-elasticsearch.git</url>
+    </scm>
 
     <build>
         <plugins>

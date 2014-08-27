@@ -1,7 +1,7 @@
 Storm Elasticsearch.
 -------------------
 
-## Bolt/Trident API implementation for Elasticsearch
+### Bolt/Trident API implementation for Elasticsearch
 
 This library provides core storm bolt and implements a Trident state on top of Elasticsearch.
 It supports non-transactional, transactional, and opaque state types.
@@ -33,8 +33,8 @@ To be indexed, a document requires at least following attributes:
 For general use cases, a default implementation is provided [DefaultTupleMapper](https://github.com/fhussonnois/storm-trident-elasticsearch/blob/master/src/main/java/com/github/fhuss/storm/elasticsearch/mapper/impl/DefaultTupleMapper.java).
 
 ### Core Bolt / IndexBatchBolt
-The IndexBatchBolt implementation relies on storm tick tuple feature and Elasticsarch [Bulk API](http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/docs-bulk.html) to 
-index many tuples
+The IndexBatchBolt implementation relies on storm tick tuple feature and Elasticsearch [Bulk API](http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/docs-bulk.html) to 
+index many tuples.
 
 ### Trident State examples
 #### Persistent Aggregate
