@@ -6,6 +6,14 @@ Storm Elasticsearch.
 This library provides core storm bolt and implements a Trident state on top of Elasticsearch.
 It supports non-transactional, transactional, and opaque state types.
 
+### Maven dependency
+```xml
+    <dependency>
+      <groupId>com.github.fhuss</groupId>
+      <artifactId>storm-elasticsearch</artifactId>
+      <version>0.2.0</version>
+    </dependency>
+```
 ### TupleMapper / TridentTupleMapper
 To index documents into elasticsearch you need to provide an implementation of following interfaces according to
 you use bolt or trident state.
