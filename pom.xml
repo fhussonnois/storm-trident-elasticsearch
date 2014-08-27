@@ -4,7 +4,13 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.github.fhuss.storm</groupId>
+    <parent>
+        <groupId>org.sonatype.oss</groupId>
+        <artifactId>oss-parent</artifactId>
+        <version>9</version>
+    </parent>
+
+    <groupId>com.github.fhuss</groupId>
     <artifactId>storm-elasticsearch</artifactId>
     <version>0.2.0</version>
     <name>Storm Trident Elasticsearch</name>
@@ -101,7 +107,6 @@
             <version>${guava.version}</version>
         </dependency>
 
-        <!-- Tests -->
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
