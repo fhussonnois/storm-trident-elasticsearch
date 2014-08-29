@@ -1,8 +1,5 @@
 package com.github.fhuss.storm.elasticsearch.bolt;
 
-import backtype.storm.Config;
-import backtype.storm.LocalCluster;
-import backtype.storm.LocalDRPC;
 import backtype.storm.generated.StormTopology;
 import backtype.storm.spout.SpoutOutputCollector;
 import backtype.storm.task.TopologyContext;
@@ -11,55 +8,24 @@ import backtype.storm.topology.TopologyBuilder;
 import backtype.storm.topology.base.BaseRichSpout;
 import backtype.storm.tuple.Fields;
 import backtype.storm.tuple.Values;
-import backtype.storm.utils.Utils;
-import com.github.fhuss.storm.elasticsearch.ClientFactory;
-import com.github.fhuss.storm.elasticsearch.domain.Tweet;
+import com.github.fhuss.storm.elasticsearch.BaseLocalClusterTest;
 import com.github.fhuss.storm.elasticsearch.mapper.impl.DefaultTupleMapper;
 import static com.github.fhuss.storm.elasticsearch.mapper.impl.DefaultTupleMapper.*;
 
-import com.github.tlrx.elasticsearch.test.EsSetup;
-import org.elasticsearch.common.settings.ImmutableSettings;
-import org.elasticsearch.common.settings.Settings;
-import org.junit.After;
+import com.github.fhuss.storm.elasticsearch.model.Tweet;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import static com.github.tlrx.elasticsearch.test.EsSetup.createIndex;
-
 /**
  * @author fhussonnois
  */
-public class IndexBatchBoltTest {
+public class IndexBatchBoltTest extends BaseLocalClusterTest {
 
-    static final Settings SETTINGS = ImmutableSettings.settingsBuilder().loadFromClasspath("elasticsearch.yml").build();
-
-    EsSetup esSetup;
-    LocalCluster cluster;
-    LocalDRPC drpc;
-
-    @Before
-    public void setUp() {
-        esSetup = new EsSetup(SETTINGS);
-        esSetup.execute(createIndex("my_index"));
-
-        drpc = new LocalDRPC();
-        StormTopology topology = buildTopology();
-
-        cluster = new LocalCluster();
-        cluster.submitTopology("elastic-storm", new Config(), topology);
-
-        Utils.sleep(10000); // let's do some work
-    }
-
-    @After
-    public void tearDown() {
-        drpc.shutdown();
-        cluster.shutdown();
-        esSetup.terminate();
+    public IndexBatchBoltTest() {
+        super("my_index");
     }
 
     @Test
@@ -67,7 +33,7 @@ public class IndexBatchBoltTest {
         Assert.assertEquals(StaticSpout.MSGS.length, esSetup.countAll().intValue());
     }
 
-
+    @Override
     public StormTopology buildTopology() {
 
         TopologyBuilder builder = new TopologyBuilder();
@@ -78,9 +44,8 @@ public class IndexBatchBoltTest {
     }
 
     protected IndexBatchBolt<String> newIndexBatchBolt( ) {
-        ClientFactory.LocalTransport clientFactory = new ClientFactory.LocalTransport(SETTINGS.getAsMap());
         DefaultTupleMapper mapper = DefaultTupleMapper.newObjectDefaultTupleMapper();
-        return new IndexBatchBolt<>(clientFactory, mapper, 5, TimeUnit.SECONDS);
+        return new IndexBatchBolt<>(getLocalClient(), mapper, 5, TimeUnit.SECONDS);
     }
 
     public static class StaticSpout extends BaseRichSpout {
