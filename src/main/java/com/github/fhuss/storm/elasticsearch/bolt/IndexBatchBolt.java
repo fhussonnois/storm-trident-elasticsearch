@@ -9,6 +9,8 @@ import com.github.fhuss.storm.elasticsearch.ClientFactory;
 import com.github.fhuss.storm.elasticsearch.Document;
 import com.github.fhuss.storm.elasticsearch.commons.RichTickTupleBolt;
 import com.github.fhuss.storm.elasticsearch.mapper.TupleMapper;
+import org.elasticsearch.ElasticsearchException;
+import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequestBuilder;
@@ -120,9 +122,31 @@ public class IndexBatchBolt<T> extends RichTickTupleBolt {
             bulkRequest.add(request);
         }
 
-        if( bulkRequest.numberOfActions() > 0) {
-            BulkResponse bulkItemResponses = bulkRequest.execute().actionGet();
-            if( bulkItemResponses.hasFailures()) failAll(inputs) ; else ackAll(inputs);
+        try {
+            if (bulkRequest.numberOfActions() > 0) {
+                BulkResponse bulkItemResponses = bulkRequest.execute().actionGet();
+                if (bulkItemResponses.hasFailures()) {
+                    BulkItemResponse[] items = bulkItemResponses.getItems();
+                    for (int i = 0; i < items.length; i++) {
+                        ackOrFail(items[i], inputs.get(i));
+                    }
+                } else {
+                    ackAll(inputs);
+                }
+            }
+        } catch (ElasticsearchException e) {
+            LOGGER.error("Unable to process bulk request, " + inputs.size() + " tuples are in failure", e);
+            outputCollector.reportError(e.getRootCause());
+            failAll(inputs);
+        }
+    }
+
+    private void ackOrFail(BulkItemResponse item, Tuple tuple) {
+        if (item.isFailed()) {
+            LOGGER.error("Failed to process tuple : " + mapper.map(tuple));
+            outputCollector.fail(tuple);
+        } else {
+            outputCollector.ack(tuple);
         }
     }
 
