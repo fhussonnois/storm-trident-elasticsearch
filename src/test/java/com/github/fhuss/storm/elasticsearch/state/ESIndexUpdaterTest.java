@@ -3,21 +3,18 @@ package com.github.fhuss.storm.elasticsearch.state;
 import backtype.storm.generated.StormTopology;
 import backtype.storm.tuple.Fields;
 import backtype.storm.tuple.Values;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.fhuss.storm.elasticsearch.BaseLocalClusterTest;
+import com.github.fhuss.storm.elasticsearch.Document;
 import com.github.fhuss.storm.elasticsearch.functions.CreateJson;
 import com.github.fhuss.storm.elasticsearch.functions.ExtractSearchArgs;
+import com.github.fhuss.storm.elasticsearch.mapper.TridentTupleMapper;
 import com.github.fhuss.storm.elasticsearch.model.Tweet;
-import com.google.common.collect.Lists;
-import com.github.fhuss.storm.elasticsearch.Document;
 import org.elasticsearch.index.query.QueryBuilders;
-import org.junit.*;
+import org.junit.Assert;
+import org.junit.Test;
 import storm.trident.TridentState;
 import storm.trident.TridentTopology;
-import storm.trident.operation.BaseFunction;
-import storm.trident.operation.ReducerAggregator;
-import storm.trident.operation.TridentCollector;
 import storm.trident.operation.builtin.FilterNull;
 import storm.trident.testing.FixedBatchSpout;
 import storm.trident.tuple.TridentTuple;
@@ -25,15 +22,13 @@ import storm.trident.tuple.TridentTuple;
 import java.io.IOException;
 
 /**
- * Default test class.
- *
  * @author fhussonnois
  */
-public class IndexMapStateTest extends BaseLocalClusterTest{
+public class ESIndexUpdaterTest extends BaseLocalClusterTest {
 
     static final ObjectMapper MAPPER = new ObjectMapper();
 
-    public IndexMapStateTest() {
+    public ESIndexUpdaterTest() {
         super("my_index");
     }
 
@@ -55,49 +50,11 @@ public class IndexMapStateTest extends BaseLocalClusterTest{
 
     protected void assertDRPC(String actual, String expected) throws IOException {
         String s = MAPPER.readValue(actual, String[][].class)[0][0];
-        Assert.assertEquals(expected, MAPPER.readValue(s, Tweet.class).getText() );
-    }
-
-    public static class DocumentBuilder extends BaseFunction {
-        @Override
-        public void execute(TridentTuple tuple, TridentCollector collector) {
-            String sentence = tuple.getString(0);
-            collector.emit(new Values( new Document<>("my_index", "my_type", sentence, String.valueOf(sentence.hashCode()))));
-        }
-    }
-
-    public static class ExtractDocumentInfo extends BaseFunction {
-        @Override
-        public void execute(TridentTuple tuple, TridentCollector collector) {
-            Document t = (Document)tuple.getValue(0);
-            collector.emit(new Values(t.getId(), t.getName(), t.getType()));
-        }
-    }
-
-    public static class TweetBuilder implements ReducerAggregator<Tweet> {
-        @Override
-        public Tweet init() {
-            return null;
-        }
-
-        @Override
-        public Tweet reduce(Tweet tweet, TridentTuple objects) {
-
-            Document<String> doc  = (Document) objects.getValueByField("document");
-            if( tweet == null)
-                tweet = new Tweet(doc.getSource(), 1);
-            else {
-                tweet.incrementCount();
-            }
-
-            return tweet;
-        }
+        Assert.assertEquals(expected, MAPPER.readValue(s, Tweet.class).getText());
     }
 
     @Override
-    public StormTopology buildTopology( ) {
-        ESIndexMapState.Factory<Tweet> state = ESIndexMapState.nonTransactional(getLocalClient(), Tweet.class);
-
+    protected StormTopology buildTopology() {
         FixedBatchSpout spout = new FixedBatchSpout(new Fields("sentence"), 3,
                 new Values("the cow jumped over the moon"),
                 new Values("the man went to the store and bought some candy"),
@@ -106,25 +63,30 @@ public class IndexMapStateTest extends BaseLocalClusterTest{
                 new Values("to be or not to be the person"));
         spout.setCycle(true);
 
+        ESIndexState.Factory<Tweet> factory = new ESIndexState.Factory<>(getLocalClient(), Tweet.class);
         TridentTopology topology = new TridentTopology();
 
-        TridentState staticState = topology.newStaticState(new ESIndexState.Factory<>(getLocalClient(), Tweet.class));
-
-        topology.newStream("tweets", spout)
-                        .each(new Fields("sentence"), new DocumentBuilder(), new Fields("document"))
-                        .each(new Fields("document"), new ExtractDocumentInfo(), new Fields("id", "index", "type"))
-                        .groupBy(new Fields("index", "type", "id"))
-                        .persistentAggregate(state, new Fields("document"), new TweetBuilder(), new Fields("tweet"))
-                        .parallelismHint(1);
+        TridentState state = topology.newStream("tweets", spout)
+                .partitionPersist(factory, new Fields("sentence"), new ESIndexUpdater(new MyTridentTupleMapper()));
 
         topology.newDRPCStream("search", drpc)
                 .each(new Fields("args"), new ExtractSearchArgs(), new Fields("query", "indices", "types"))
                 .groupBy(new Fields("query", "indices", "types"))
-                .stateQuery(staticState, new Fields("query", "indices", "types"), new QuerySearchIndexQuery(), new Fields("tweet"))
+                .stateQuery(state, new Fields("query", "indices", "types"), new QuerySearchIndexQuery(), new Fields("tweet"))
                 .each(new Fields("tweet"), new FilterNull())
                 .each(new Fields("tweet"), new CreateJson(), new Fields("json"))
                 .project(new Fields("json"));
 
         return topology.build();
+    }
+
+
+    public static class MyTridentTupleMapper implements TridentTupleMapper<Document<Tweet>> {
+
+        @Override
+        public Document<Tweet> map(TridentTuple input) {
+            String sentence = input.getStringByField("sentence");
+            return new Document<>("my_index", "my_type", new Tweet(sentence, 0), String.valueOf(sentence.hashCode()), null);
+        }
     }
 }

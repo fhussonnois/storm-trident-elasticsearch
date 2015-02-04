@@ -53,7 +53,8 @@ public class ESIndexState<T> implements State {
         BulkRequestBuilder bulkRequest = client.prepareBulk();
         for (TridentTuple input : inputs) {
             Document<T> doc = mapper.map(input);
-            IndexRequestBuilder request = client.prepareIndex(doc.getName(), doc.getType(), doc.getId()).setSource((String)doc.getSource());
+            byte[] source = serializeSourceOrFail(doc);
+            IndexRequestBuilder request = client.prepareIndex(doc.getName(), doc.getType(), doc.getId()).setSource(source);
 
             if(doc.getParentId() != null) {
                 request.setParent(doc.getParentId());
@@ -68,6 +69,15 @@ public class ESIndexState<T> implements State {
                 LOGGER.error("error while executing bulk request to elasticsearch");
                 throw new FailedException("Failed to store data into elasticsearch", e);
             }
+        }
+    }
+
+    protected byte[] serializeSourceOrFail(Document<T> doc) {
+        try {
+            return serializer.serialize(doc.getSource());
+        } catch (IOException e) {
+            LOGGER.error("Error while serializing document source", e);
+            throw new FailedException("Failed to serialize source as byte[]", e);
         }
     }
 
