@@ -1,13 +1,17 @@
 package com.github.fhuss.storm.elasticsearch;
 
+import java.io.Serializable;
+
 /**
  * This class should be used to wrap data required to index a document.
  *
  * @author fhussonnois
  * @param <T> type of the underlying document
  */
-public class Document<T> {
+public class Document<T> implements Serializable {
 
+    private static final long serialVersionUID = 1L;
+    
     /**
      * The name of the index
      */
