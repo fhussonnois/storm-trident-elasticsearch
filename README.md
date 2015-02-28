@@ -11,7 +11,7 @@ It supports non-transactional, transactional, and opaque state types.
     <dependency>
       <groupId>com.github.fhuss</groupId>
       <artifactId>storm-elasticsearch</artifactId>
-      <version>0.2.0</version>
+      <version>0.3.0</version>
     </dependency>
 ```
 ### TupleMapper / TridentTupleMapper
