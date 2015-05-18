@@ -1,7 +1,9 @@
-Storm Elasticsearch.
--------------------
+Apache Storm - Elasticsearch
+----------------------------
 
-### Bolt/Trident API implementation for Elasticsearch
+[Apache Storm](https://storm.apache.org/) is a free and open source distributed realtime computation system.
+
+### Bolt/Trident API implementation for [Elasticsearch](https://www.elastic.co/)
 
 This library provides core storm bolt and implements a Trident state on top of Elasticsearch.
 It supports non-transactional, transactional, and opaque state types.
@@ -83,3 +85,22 @@ index many tuples.
             .each(new Fields("tweet"), new CreateJson(), new Fields("json"))
             .project(new Fields("json"));
 ```
+
+## License
+
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
